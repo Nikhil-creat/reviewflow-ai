@@ -4,4 +4,5 @@ export const CREDIT = {
   name: "NIKHIL CHARY SRIRAMOJU",
   github: "https://github.com/Nikhil-creat",
   linkedin: "https://in.linkedin.com/in/nikhil-chary-sriramoju-95041b38a",
+  email: "sriramojunikhil66@gmail.com",
 };

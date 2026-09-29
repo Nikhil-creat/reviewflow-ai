@@ -3,6 +3,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, Brain, Eye, Radar, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import Credit from "@/components/Credit";
+import { CREDIT } from "@/lib/config";
 
 const FEATURES = [
   { icon: Radar, t: "Autonomous agent loop", d: "A LangGraph state machine syncs reviews, scores sentiment, drafts replies and dispatches - or escalates volatile ones to you.", c: "text-neon-cyan" },
@@ -56,6 +57,12 @@ export default function Landing() {
               <p className="text-sm font-semibold text-slate-300">{p.n}</p>
               <p className="mt-2 text-4xl font-extrabold">{p.p}<span className="text-sm font-normal text-slate-500"> / mo</span></p>
               <ul className="mt-4 space-y-2 text-sm text-slate-300">{p.f.map((x) => <li key={x}>✓ {x}</li>)}</ul>
+              <a
+                href={`mailto:${CREDIT.email}?subject=${encodeURIComponent(`ReviewFlow AI - ${p.n} plan`)}&body=${encodeURIComponent(`Hi, I'd like to subscribe to the ${p.n} plan ($${p.p}/mo).`)}`}
+                className="btn-primary mt-5 w-full justify-center"
+              >
+                Contact to subscribe
+              </a>
             </div>
           ))}
         </div>
