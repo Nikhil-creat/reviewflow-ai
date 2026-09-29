@@ -1,0 +1,169 @@
+name: reviewflow-ai
+
+# ---------------------------------------------------------------
+# ReviewFlow AI - local development topology
+#   frontend  : Next.js 14 dashboard            -> http://localhost:3000
+#   backend   : FastAPI + LangGraph + WebSocket -> http://localhost:8000
+#   worker    : autopilot agent loop (same image as backend)
+#   vision    : Pillow/OpenCV quote-card service (internal :8100)
+#   redis     : task broker + pub/sub for live telemetry
+#   db        : local Postgres 16 + pgvector (mirrors Supabase)
+# Copy .env.example to .env and set GROQ_API_KEY before `docker compose up`.
+# ---------------------------------------------------------------
+
+x-backend-env: &backend-env
+  GROQ_API_KEY: ${GROQ_API_KEY:?Set GROQ_API_KEY in .env (free key at console.groq.com)}
+  GROQ_BASE_URL: https://api.groq.com/openai/v1
+  GROQ_MODEL_FAST: ${GROQ_MODEL_FAST:-llama-3.1-8b-instant}
+  GROQ_MODEL_SMART: ${GROQ_MODEL_SMART:-llama-3.3-70b-versatile}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}
+  EMBEDDING_DIM: "384"
+  DATABASE_URL: postgresql://${POSTGRES_USER:-reviewflow}:${POSTGRES_PASSWORD:-reviewflow_dev}@db:5432/${POSTGRES_DB:-reviewflow}
+  REDIS_URL: redis://redis:6379/0
+  VISION_SERVICE_URL: http://vision:8100
+  AUTOPILOT_INTERVAL_SECONDS: ${AUTOPILOT_INTERVAL_SECONDS:-60}
+  AUTO_REPLY_MIN_CONFIDENCE: ${AUTO_REPLY_MIN_CONFIDENCE:-0.85}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+  SEED_DEMO: ${SEED_DEMO:-true}
+  SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+  GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: rf-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-reviewflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reviewflow_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-reviewflow}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Files run in alphabetical order on first boot:
+      # 000 = local stand-in for Supabase auth/roles, 001 = the real schema
+      - ./db/local-init/000_local_supabase_stub.sql:/docker-entrypoint-initdb.d/000_local_supabase_stub.sql:ro
+      - ./supabase/migrations/001_reviewflow_schema.sql:/docker-entrypoint-initdb.d/001_reviewflow_schema.sql:ro
+      - ./supabase/migrations/002_connectors.sql:/docker-entrypoint-initdb.d/002_connectors.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-reviewflow} -d ${POSTGRES_DB:-reviewflow}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [rf-net]
+
+  redis:
+    image: redis:7-alpine
+    container_name: rf-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [rf-net]
+
+  vision:
+    build:
+      context: ./vision
+      dockerfile: Dockerfile
+    container_name: rf-vision
+    restart: unless-stopped
+    environment:
+      ASSET_OUTPUT_DIR: /data/assets
+    volumes:
+      - assets:/data/assets
+    expose:
+      - "8100"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8100/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [rf-net]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rf-backend
+    restart: unless-stopped
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      <<: *backend-env
+      RUN_AUTOPILOT_IN_PROCESS: "false"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - assets:/data/assets:ro
+      - hf-cache:/root/.cache/huggingface
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      vision:
+        condition: service_healthy
+    networks: [rf-net]
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rf-worker
+    restart: unless-stopped
+    command: ["python", "-m", "agents.autopilot_worker"]
+    environment:
+      <<: *backend-env
+    volumes:
+      - ./backend:/app
+      - assets:/data/assets
+      - hf-cache:/root/.cache/huggingface
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      vision:
+        condition: service_healthy
+    networks: [rf-net]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: rf-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:8000}
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks: [rf-net]
+
+networks:
+  rf-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
+  assets:
+  hf-cache:
