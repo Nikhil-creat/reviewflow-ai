@@ -6,8 +6,15 @@ your own past replies (pgvector), auto-posts the safe ones, escalates the risky 
 human, and turns your best 5-star reviews into shareable social quote cards with a
 convolutional vision pipeline — all on free-tier, sub-second Groq inference.
 
-**Designed & developed by [NIKHIL CHARY SRIRAMOJU](https://github.com/Nikhil-creat)**
-· [LinkedIn](https://in.linkedin.com/in/nikhil-chary-sriramoju-95041b38a) · [Instagram](https://www.instagram.com/nikhil__sriramoju)
+## Designed and Developed by 
+# **NIKHIL CHARY SRIRAMOJU**
+BTech CSE (Final Year)
+
+- GitHub: [Nikhil-creat](https://github.com/Nikhil-creat)
+- LinkedIn: [nikhil-chary-sriramoju](https://in.linkedin.com/in/nikhil-chary-sriramoju-95041b38a)
+- Email: sriramojunikhil66@gmail.com
+- Instagram: [@nikhil__sriramoju](https://www.instagram.com/nikhil__sriramoju)
+- Facebook: [Profile](https://www.facebook.com/profile.php?id=100079201124141)
 
 ---
 
@@ -161,6 +168,6 @@ MIT — see [`LICENSE`](./LICENSE).
 
 ---
 
-<p align="center"><b>Designed & developed by NIKHIL CHARY SRIRAMOJU</b><br/>
+<p align="center"><b>Designed & Developed by NIKHIL CHARY SRIRAMOJU</b><br/>
 <a href="https://github.com/Nikhil-creat">GitHub</a> ·
 <a href="https://in.linkedin.com/in/nikhil-chary-sriramoju-95041b38a">LinkedIn</a></p>
